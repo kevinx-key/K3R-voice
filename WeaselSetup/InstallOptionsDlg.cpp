@@ -2,6 +2,7 @@
 #include "InstallOptionsDlg.h"
 #include <atlstr.h>
 #include <ShlObj.h>
+#include <WeaselUtility.h>
 #pragma comment(lib, "Shell32.lib")
 
 int uninstall(bool silent);
@@ -44,6 +45,23 @@ LRESULT InstallOptionsDialog::OnInitDialog(UINT, WPARAM, LPARAM, BOOL&) {
   ime_.Attach(GetDlgItem(IDC_CHECK_INSTIME));
   if (installed)
     ime_.EnableWindow(FALSE);
+
+  // K3R-voice fork: "倾听输入法 设置" button.  It is created here instead of in
+  // the .rc template so that the upstream dialog resources stay untouched.
+  {
+    RECT rc = {67, 115, 142, 129};  // dialog units, between 安装 and 删除
+    MapDialogRect(&rc);
+    HWND h_ai_voice = ::CreateWindowExW(
+        0, L"BUTTON", L"倾听输入法 设置 (&V)",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, rc.left, rc.top,
+        rc.right - rc.left, rc.bottom - rc.top, m_hWnd, (HMENU)IDC_AI_VOICE,
+        NULL, NULL);
+    if (h_ai_voice) {
+      ai_voice_.Attach(h_ai_voice);
+      ::SendMessageW(h_ai_voice, WM_SETFONT,
+                     ::SendMessageW(m_hWnd, WM_GETFONT, 0, 0), TRUE);
+    }
+  }
 
   CenterWindow();
   return 0;
@@ -118,5 +136,11 @@ LRESULT InstallOptionsDialog::OnUseCustomDir(WORD, WORD code, HWND, BOOL&) {
     }
   }
   ok_.SetFocus();
+  return 0;
+}
+
+LRESULT InstallOptionsDialog::OnAiVoice(WORD, WORD code, HWND, BOOL&) {
+  // K3R-voice fork: open the Listen settings window.
+  LaunchListenSettings(m_hWnd);
   return 0;
 }

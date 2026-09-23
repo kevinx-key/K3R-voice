@@ -3,6 +3,7 @@
 #include <string>
 #include <sstream>
 #include <wrl/client.h>
+#include <shellapi.h>
 using namespace Microsoft::WRL;
 
 namespace fs = std::filesystem;
@@ -186,17 +187,77 @@ inline std::basic_string<CharT> unescape_string(
 // resource
 std::string GetCustomResource(const char* name, const char* type);
 
+// K3R-voice fork: unified entry point -- launch the Listen app settings window.
+//
+// 解析顺序（自己查注册表，而不是把裸文件名交给 ShellExecute：实测在提权进程里
+// ShellExecuteW 对裸文件名的 App Paths 解析会失败，返回 SE_ERR_FNF）：
+//   1) App Paths 注册表：HKLM 64/32 视图 + HKCU 64/32 视图
+//   2) 裸文件名（交给系统按 PATH / App Paths 解析）
+//   3) 常见安装位置兜底
+inline bool LaunchListenSettings(HWND hParent = NULL) {
+  const wchar_t* kAppPaths =
+      L"Software\\Microsoft\\Windows\\CurrentVersion\\App Paths\\listen.exe";
+
+  std::wstring exe;
+  const HKEY roots[] = {HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER};
+  const REGSAM views[] = {KEY_WOW64_64KEY, KEY_WOW64_32KEY};
+  for (HKEY root : roots) {
+    for (REGSAM view : views) {
+      HKEY key = NULL;
+      if (RegOpenKeyExW(root, kAppPaths, 0, KEY_READ | view, &key) !=
+          ERROR_SUCCESS)
+        continue;
+      wchar_t buf[MAX_PATH] = {0};
+      DWORD cb = sizeof(buf);
+      DWORD type = 0;
+      LONG r = RegQueryValueExW(key, NULL, NULL, &type, (LPBYTE)buf, &cb);
+      RegCloseKey(key);
+      if (r == ERROR_SUCCESS && buf[0]) {
+        exe = buf;
+        if (exe.size() >= 2 && exe.front() == L'"' && exe.back() == L'"')
+          exe = exe.substr(1, exe.size() - 2);
+        break;
+      }
+    }
+    if (!exe.empty())
+      break;
+  }
+
+  auto launch = [](const std::wstring& path) -> bool {
+    if (path.empty())
+      return false;
+    return (uintptr_t)ShellExecuteW(NULL, L"open", path.c_str(), L"--settings",
+                                    NULL, SW_SHOWNORMAL) > 32;
+  };
+
+  if (launch(exe) || launch(L"listen.exe"))
+    return true;
+
+  wchar_t dir[MAX_PATH] = {0};
+  if (GetEnvironmentVariableW(L"ProgramFiles", dir, MAX_PATH) &&
+      launch(std::wstring(dir) + L"\\Listen\\listen.exe"))
+    return true;
+  if (GetEnvironmentVariableW(L"LOCALAPPDATA", dir, MAX_PATH) &&
+      launch(std::wstring(dir) + L"\\Programs\\Listen\\listen.exe"))
+    return true;
+
+  MessageBoxW(hParent, L"未找到倾听输入法，请先安装。", L"倾听输入法",
+              MB_ICONINFORMATION | MB_OK);
+  return false;
+}
+
 inline std::wstring get_weasel_ime_name() {
   LANGID langId = GetUserDefaultUILanguage();
 
   if (langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL) ||
-      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED) ||
       langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_HONGKONG) ||
-      langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SINGAPORE) ||
       langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_MACAU)) {
-    return L"小狼毫";
+    return L"傾聽輸入法";
+  } else if (langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED) ||
+             langId == MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SINGAPORE)) {
+    return L"倾听输入法";
   } else {
-    return L"Weasel";
+    return L"Listen";
   }
 }
 

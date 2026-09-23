@@ -98,6 +98,23 @@ LRESULT SwitcherSettingsDialog::OnInitDialog(UINT, WPARAM, LPARAM, BOOL&) {
   get_schemata_.Attach(GetDlgItem(IDC_GET_SCHEMATA));
   get_schemata_.EnableWindow(TRUE);
 
+  // K3R-voice fork: "倾听输入法 设置" button.  Created dynamically so that the
+  // upstream dialog templates stay untouched.
+  {
+    RECT rc = {189, 169, 309, 183};  // dialog units, right of the OK button
+    MapDialogRect(&rc);
+    HWND h_ai_voice = ::CreateWindowExW(
+        0, L"BUTTON", L"倾听输入法 设置 (&V)",
+        WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON, rc.left, rc.top,
+        rc.right - rc.left, rc.bottom - rc.top, m_hWnd, (HMENU)IDC_AI_VOICE,
+        NULL, NULL);
+    if (h_ai_voice) {
+      ai_voice_.Attach(h_ai_voice);
+      ::SendMessageW(h_ai_voice, WM_SETFONT,
+                     ::SendMessageW(m_hWnd, WM_GETFONT, 0, 0), TRUE);
+    }
+  }
+
   Populate();
 
   CenterWindow();
@@ -153,6 +170,12 @@ LRESULT SwitcherSettingsDialog::OnGetSchemata(WORD, WORD, HWND hWndCtl, BOOL&) {
     }
   }
   RegCloseKey(hKey);
+  return 0;
+}
+
+LRESULT SwitcherSettingsDialog::OnAiVoice(WORD, WORD code, HWND, BOOL&) {
+  // K3R-voice fork: open the Listen settings window.
+  LaunchListenSettings(m_hWnd);
   return 0;
 }
 

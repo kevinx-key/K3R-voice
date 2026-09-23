@@ -1,0 +1,153 @@
+Boost 1.84.0 — add MSVC 14.5x (Visual Studio 2026 / toolset v145) support
+======================================================================
+
+Why
+---
+Boost 1.84.0 ships a Boost.Build that only knows MSVC up to 14.3 (VS2022 /
+v143).  The machine this fork is built on only has Visual Studio 2026
+(MSVC 14.50 / v145) and installing the v143 toolset requires administrator
+rights.  These patches teach Boost.Build and Boost's auto-link header about
+the 14.5 toolset so that:
+
+  * b2 can bootstrap with the VS2026 toolchain (via the existing "vcunk"
+    auto-detection path),
+  * b2 can build the libraries with `toolset=msvc-14.5`, producing
+    `libboost_*-vc145-*` names, and
+  * `boost/config/auto_link.hpp` emits the matching `vc145` tag when the
+    consuming project is compiled with MSVC 14.50 (_MSC_VER 1950).
+
+How to apply
+------------
+Extract boost-1.84.0 (https://github.com/boostorg/boost/releases/download/boost-1.84.0/boost-1.84.0.7z)
+to e.g. K:\Libraries\boost-1.84.0, then from that directory:
+
+    git apply -p1 boost-1.84.0-msvc-14.5.patch
+
+(Also works with `patch -p1 < boost-1.84.0-msvc-14.5.patch`.)
+
+Nothing here is needed when building with MSVC <= 14.3.
+
+---
+diff --git a/tools/build/src/tools/msvc.jam b/tools/build/src/tools/msvc.jam
+--- a/tools/build/src/tools/msvc.jam
++++ b/tools/build/src/tools/msvc.jam
+@@ -1137,7 +1137,15 @@ local rule generate-setup-cmd ( version : command : parent : options * : cpu : g
+         }
+         else
+         {
+-            if [ MATCH "(14.3)" : $(version) ]
++            if [ MATCH "(14.5)" : $(version) ]
++            {
++                if $(.debug-configuration)
++                {
++                    ECHO "notice: [generate-setup-cmd] $(version) is 14.5" ;
++                }
++                parent = [ path.native [ path.join  $(parent) "..\\..\\..\\..\\..\\Auxiliary\\Build" ] ] ;
++            }
++            else if [ MATCH "(14.3)" : $(version) ]
+             {
+                 if $(.debug-configuration)
+                 {
+@@ -1316,7 +1324,11 @@ local rule configure-really ( version ? : options * )
+             # version from the path.
+             # FIXME: We currently detect both Microsoft Visual Studio 9.0 and
+             # 9.0express as 9.0 here.
+-            if [ MATCH "(MSVC\\\\14.3)" : $(command) ]
++            if [ MATCH "(MSVC\\\\14.5)" : $(command) ]
++            {
++                version = 14.5 ;
++            }
++            else if [ MATCH "(MSVC\\\\14.3)" : $(command) ]
+             {
+                 version = 14.3 ;
+             }
+@@ -1745,13 +1757,17 @@ local rule default-path ( version )
+         # And fortunately, forward slashes do also work in native Windows.
+         local vswhere = "$(root)/Microsoft Visual Studio/Installer/vswhere.exe" ;
+         # The check for $(root) is to avoid a segmentation fault if not found.
+-        if $(version) in 14.1 14.2 14.3 default && $(root) && [ path.exists $(vswhere) ]
++        if $(version) in 14.1 14.2 14.3 14.5 default && $(root) && [ path.exists $(vswhere) ]
+         {
+             local req = "-requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64" ;
+             local prop = "-property installationPath" ;
+             local limit ;
+ 
+-            if $(version) = 14.3
++            if $(version) = 14.5
++            {
++                limit = "-version \"[18.0,19.0)\" -prerelease" ;
++            }
++            else if $(version) = 14.3
+             {
+                 limit = "-version \"[17.0,18.0)\" -prerelease" ;
+             }
+@@ -2173,7 +2189,7 @@ for local arch in [ MATCH "^\\.cpus-on-(.*)" : [ VARNAMES $(__name__) ] ]
+                      armv7 armv7s ;
+ 
+ # Known toolset versions, in order of preference.
+-.known-versions = 14.3 14.2 14.1 14.0 12.0 11.0 10.0 10.0express 9.0 9.0express 8.0 8.0express 7.1
++.known-versions = 14.5 14.3 14.2 14.1 14.0 12.0 11.0 10.0 10.0express 9.0 9.0express 8.0 8.0express 7.1
+     7.1toolkit 7.0 6.0 ;
+ 
+ # Version aliases.
+@@ -2225,6 +2241,11 @@ for local arch in [ MATCH "^\\.cpus-on-(.*)" : [ VARNAMES $(__name__) ] ]
+     "Microsoft Visual Studio/2022/*/VC/Tools/MSVC/*/bin/Host*/*"
+     ;
+ .version-14.3-env = VS170COMNTOOLS ProgramFiles ProgramFiles(x86) ;
++.version-14.5-path =
++    "../../VC/Tools/MSVC/*/bin/Host*/*"
++    "Microsoft Visual Studio/18/*/VC/Tools/MSVC/*/bin/Host*/*"
++    ;
++.version-14.5-env = VS180COMNTOOLS ProgramFiles ProgramFiles(x86) ;
+ 
+ # Auto-detect all the available msvc installations on the system.
+ auto-detect-toolset-versions ;
+diff --git a/tools/build/src/engine/config_toolset.bat b/tools/build/src/engine/config_toolset.bat
+--- a/tools/build/src/engine/config_toolset.bat
++++ b/tools/build/src/engine/config_toolset.bat
+@@ -12,6 +12,7 @@ if "_%B2_TOOLSET%_" == "_vc14_" call :Config_VC14
+ if "_%B2_TOOLSET%_" == "_vc141_" call :Config_VC141
+ if "_%B2_TOOLSET%_" == "_vc142_" call :Config_VC142
+ if "_%B2_TOOLSET%_" == "_vc143_" call :Config_VC143
++if "_%B2_TOOLSET%_" == "_vcunk_" call :Config_VCUNK
+ if "_%B2_TOOLSET%_" == "_borland_" call :Config_BORLAND
+ if "_%B2_TOOLSET%_" == "_como_" call :Config_COMO
+ if "_%B2_TOOLSET%_" == "_gcc_" call :Config_GCC
+@@ -163,6 +164,7 @@ goto :eof
+ 
+ :Config_VCUNK
+ if NOT "_%B2_TOOLSET%_" == "_vcunk_" goto Skip_VCUNK
++if not defined CXX ( set "CXX=cl" )
+ call vswhere_usability_wrapper.cmd
+ REM Reset ERRORLEVEL since from now on it's all based on ENV vars
+ ver > nul 2> nul
+@@ -178,7 +180,7 @@ REM return to current directory as vsdevcmd_end.bat switches to %USERPROFILE%\So
+ pushd %CD%
+ if "_%VSINSTALLDIR%_" == "__" call :Call_If_Exists "%B2_TOOLSET_ROOT%Auxiliary\Build\vcvarsall.bat" %B2_BUILD_ARGS%
+ popd
+-set "B2_CXX="%CXX%" /nologo /MP /MT /TP /Feb2 /wd4996 /O2 /GL /EHsc"
++set "B2_CXX="%CXX%" /nologo -TP /wd4996 /wd4675 /EHs /GR /Zc:throwingNew /O2 /Ob2 /W3 /MD /Zc:forScope /Zc:wchar_t /Zc:inline /Gw /favor:blend /Feb2"
+ set "B2_CXX_LINK=/link kernel32.lib advapi32.lib user32.lib"
+ set "_known_=1"
+ goto :eof
+diff --git a/libs/config/include/boost/config/auto_link.hpp b/libs/config/include/boost/config/auto_link.hpp
+--- a/libs/config/include/boost/config/auto_link.hpp
++++ b/libs/config/include/boost/config/auto_link.hpp
+@@ -187,11 +187,16 @@ BOOST_LIB_SUFFIX:     Static/import libraries extension (".lib", ".a") for the c
+      // vc14.2:
+ #    define BOOST_LIB_TOOLSET "vc142"
+ 
+-#  elif defined(BOOST_MSVC)
++#  elif defined(BOOST_MSVC) && (BOOST_MSVC < 1950)
+ 
+      // vc14.3:
+ #    define BOOST_LIB_TOOLSET "vc143"
+ 
++#  elif defined(BOOST_MSVC)
++
++     // vc14.5:
++#    define BOOST_LIB_TOOLSET "vc145"
++
+ #  elif defined(BOOST_EMBTC_WINDOWS)
+ 
+      // Embarcadero Clang based compilers:

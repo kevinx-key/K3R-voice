@@ -36,6 +36,7 @@
 #define IDC_CHECK1                      1006
 #define IDC_CHECK_INSTIME               1006
 #define IDC_BUTTON_CUSTOM_DIR           1007
+#define IDC_AI_VOICE                    1008
 
 // Next default values for new objects
 // 

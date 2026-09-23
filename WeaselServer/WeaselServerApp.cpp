@@ -16,17 +16,20 @@ int WeaselServerApp::Run() {
   if (!m_server.Start())
     return -1;
 
+  // K3R-voice fork: WinSparkle update checking is disabled on purpose.
+  // This fork follows its own release cycle and must not offer to upgrade to
+  // the upstream rime/weasel build.
   // win_sparkle_set_appcast_url("http://localhost:8000/weasel/update/appcast.xml");
-  win_sparkle_set_registry_path("Software\\Rime\\Weasel\\Updates");
-  if (GetThreadUILanguage() ==
-      MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL))
-    win_sparkle_set_lang("zh-TW");
-  else if (GetThreadUILanguage() ==
-           MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED))
-    win_sparkle_set_lang("zh-CN");
-  else
-    win_sparkle_set_lang("en");
-  win_sparkle_init();
+  // win_sparkle_set_registry_path("Software\\Rime\\Weasel\\Updates");
+  // if (GetThreadUILanguage() ==
+  //     MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_TRADITIONAL))
+  //   win_sparkle_set_lang("zh-TW");
+  // else if (GetThreadUILanguage() ==
+  //          MAKELANGID(LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED))
+  //   win_sparkle_set_lang("zh-CN");
+  // else
+  //   win_sparkle_set_lang("en");
+  // win_sparkle_init();
   m_ui.Create(m_server.GetHWnd());
 
   m_handler->Initialize();
@@ -40,7 +43,8 @@ int WeaselServerApp::Run() {
   m_handler->Finalize();
   m_ui.Destroy();
   tray_icon.RemoveIcon();
-  win_sparkle_cleanup();
+  // K3R-voice fork: WinSparkle is never initialized, nothing to clean up.
+  // win_sparkle_cleanup();
 
   return ret;
 }
@@ -73,4 +77,7 @@ void WeaselServerApp::SetupMenuHandlers() {
                           std::bind(explore, WeaselUserDataPath()));
   m_server.AddMenuHandler(ID_WEASELTRAY_LOGDIR,
                           std::bind(explore, WeaselLogPath()));
+  // K3R-voice fork: Listen settings entry
+  m_server.AddMenuHandler(ID_WEASELTRAY_AIVOICE,
+                          [] { return LaunchListenSettings(); });
 }

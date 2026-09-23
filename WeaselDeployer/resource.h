@@ -50,6 +50,7 @@
 #define IDC_RESTORE                     1009
 #define IDC_EXPORT                      1010
 #define IDC_IMPORT                      1011
+#define IDC_AI_VOICE                    1012
 #define IDC_STATIC1                     -1
 
 // Next default values for new objects

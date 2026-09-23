@@ -88,6 +88,7 @@ class InstallOptionsDialog : public CDialogImpl<InstallOptionsDialog> {
   COMMAND_ID_HANDLER(IDC_RADIO_DEFAULT_DIR, OnUseDefaultDir)
   COMMAND_ID_HANDLER(IDC_RADIO_CUSTOM_DIR, OnUseCustomDir)
   COMMAND_ID_HANDLER(IDC_BUTTON_CUSTOM_DIR, OnUseCustomDir)
+  COMMAND_ID_HANDLER(IDC_AI_VOICE, OnAiVoice)
   END_MSG_MAP()
 
   LRESULT OnInitDialog(UINT, WPARAM, LPARAM, BOOL&);
@@ -96,6 +97,7 @@ class InstallOptionsDialog : public CDialogImpl<InstallOptionsDialog> {
   LRESULT OnRemove(WORD, WORD code, HWND, BOOL&);
   LRESULT OnUseDefaultDir(WORD, WORD code, HWND, BOOL&);
   LRESULT OnUseCustomDir(WORD, WORD code, HWND, BOOL&);
+  LRESULT OnAiVoice(WORD, WORD code, HWND, BOOL&);
 
   CButton cn_;
   CButton tw_;
@@ -105,5 +107,6 @@ class InstallOptionsDialog : public CDialogImpl<InstallOptionsDialog> {
   CButton ok_;
   CButton ime_;
   CButton button_custom_dir_;
+  CButton ai_voice_;
   CEdit dir_;
 };

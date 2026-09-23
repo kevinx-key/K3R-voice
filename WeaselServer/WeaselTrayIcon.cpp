@@ -17,7 +17,17 @@ WeaselTrayIcon::WeaselTrayIcon(weasel::UI& ui)
       m_schema_ascii_icon(),
       m_disabled(false) {}
 
-void WeaselTrayIcon::CustomizeMenu(HMENU hMenu) {}
+void WeaselTrayIcon::CustomizeMenu(HMENU hMenu) {
+  // K3R-voice fork: add the "倾听输入法 设置" entry right below "输入法设定".
+  if (!hMenu)
+    return;
+  MENUITEMINFOW mii = {sizeof(MENUITEMINFOW)};
+  mii.fMask = MIIM_FTYPE | MIIM_ID | MIIM_STRING;
+  mii.fType = MFT_STRING;
+  mii.wID = ID_WEASELTRAY_AIVOICE;
+  mii.dwTypeData = const_cast<LPWSTR>(L"倾听输入法 设置 (&V)");
+  ::InsertMenuItemW(hMenu, 1, TRUE, &mii);
+}
 
 BOOL WeaselTrayIcon::Create(HWND hTargetWnd) {
   HMODULE hModule = GetModuleHandle(NULL);
